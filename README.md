@@ -120,15 +120,15 @@ is Shanghai, so Cancun opcodes must never be emitted.
 | Explorer | https://explorer-test.qday.info/address/0xb5b3F54E5D4D8e2783F1eD5E6f9f64c2749A5C17 |
 | Deployed from commit | `18d38aff44aa9901bc04fafa187b7314e069f1b6` |
 | tUSD8 (fixed) | `0x456569838f1d43009A91ebA4263147Afd7233483` |
-| Live demo UI | `TODO_AFTER_DEPLOY` |
+| Live demo UI | https://rainbow-gecko-9ba734.netlify.app (interim host; canonical demo ships with this repo) |
 
 Sample end-to-end transactions (create → pay → receipt):
 
 | Step | Tx hash |
 |---|---|
-| createInvoice | `TODO_AFTER_DEPLOY` |
-| approve (payer) | `TODO_AFTER_DEPLOY` |
-| payInvoice | `TODO_AFTER_DEPLOY` |
+| createInvoice | `0x4e0130dcf7b5a37cfe47e058f09649de5750721165a4f59002e8354de692e696` |
+| approve (payer) | `0xbbf565abc062884b50d85ace4872f351b8ec5bde98d4c3578ff7b51c7ad66854` |
+| payInvoice | `0xaa2edd37c71e3fa3e0e046c6464bd3279809c32011973b2f8e4dfef20da35801` |
 
 Deploy sketch (the deployer wallet is a dedicated testnet wallet funded from
 the QDay Discord faucet with 1 tQDAY + 5 tUSD8):
