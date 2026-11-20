@@ -1,0 +1,45 @@
+=== PayReceipt — build & test log ===
+Date: 2026-11-20 10:44 UTC
+forge: forge Version: 1.9.0
+
+--- forge build ---
+No files changed, compilation skipped
+
+warning[reentrancy-no-eth]: external call can be reentered before `_guard` is updated
+
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+
+warning[unsafe-typecast]: typecast can truncate values
+    ├ note: consider disabling this lint if you're certain the cast is safe
+
+warning[reentrancy-no-eth]: external call can be reentered before `_guard` is updated
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+
+
+
+
+--- forge test ---
+No files changed, compilation skipped
+
+Ran 16 tests for test/PayReceipt.t.sol:PayReceiptTest
+[PASS] test_CancelInvoice_ByMerchant() (gas: 258233)
+[PASS] test_CancelInvoice_NonMerchantReverts() (gas: 224685)
+[PASS] test_CreateInvoice_PastExpiryReverts() (gas: 36653)
+[PASS] test_CreateInvoice_StoresAllFields() (gas: 240506)
+[PASS] test_CreateInvoice_ZeroAmountReverts() (gas: 36630)
+[PASS] test_CreateInvoice_ZeroPayeeReverts() (gas: 34421)
+[PASS] test_PayInvoice_AfterCancelReverts() (gas: 315310)
+[PASS] test_PayInvoice_AfterExpiryReverts() (gas: 321625)
+[PASS] test_PayInvoice_AtExactExpirySucceeds() (gas: 366604)
+[PASS] test_PayInvoice_DoublePaymentReverts() (gas: 426449)
+[PASS] test_PayInvoice_ExactPaymentAndReceipt() (gas: 427488)
+[PASS] test_PayInvoice_UnknownIdReverts() (gas: 39811)
+[PASS] test_PayInvoice_WithoutApprovalReverts() (gas: 286463)
+[PASS] test_RefundInvoice_NonMerchantReverts() (gas: 378950)
+[PASS] test_RefundInvoice_OpenInvoiceReverts() (gas: 230112)
+[PASS] test_RefundInvoice_ReturnsFundsToPayerAndLocks() (gas: 625606)
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 2.52ms (3.90ms CPU time)
+
+Ran 1 test suite in 6.33ms (2.52ms CPU time): 16 tests passed, 0 failed, 0 skipped (16 total tests)
