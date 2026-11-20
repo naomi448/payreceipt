@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PayReceipt — Invoice payments with on-chain receipts (Aevum testnet)</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b21; --line:#2a2f38; --txt:#e8eaed; --mut:#9aa3af; --acc:#f97316; --ok:#22c55e; --bad:#ef4444; --warn:#eab308; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); }
+  main { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:28px; margin:8px 0 4px; }
+  h2 { font-size:18px; margin:0 0 12px; }
+  p.sub { color:var(--mut); margin:0 0 16px; line-height:1.5; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin:16px 0; }
+  label { display:block; font-size:13px; color:var(--mut); margin:12px 0 4px; }
+  input { width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); background:#0c0e11; color:var(--txt); font-size:15px; }
+  button { background:var(--acc); color:#fff; border:0; border-radius:8px; padding:11px 18px; font-size:15px; cursor:pointer; margin-top:14px; }
+  button.secondary { background:#2a2f38; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:180px; }
+  .kv { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  .kv b { text-align:right; word-break:break-all; }
+  .badge { padding:2px 10px; border-radius:99px; font-size:12px; font-weight:600; }
+  .b-open { background:#1d4ed8; } .b-paid { background:var(--ok); color:#04150a; }
+  .b-cancelled, .b-refunded { background:#4b5563; } .b-expired { background:var(--warn); color:#1a1400; }
+  .note { font-size:13px; color:var(--mut); line-height:1.5; }
+  .banner { border:1px solid var(--warn); color:var(--warn); border-radius:8px; padding:10px 12px; font-size:13px; margin:12px 0; }
+  .msg { font-size:14px; margin-top:12px; min-height:20px; }
+  .msg.err { color:var(--bad); } .msg.ok { color:var(--ok); }
+  a { color:var(--acc); }
+  code { background:#0c0e11; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .cop { background:#12241a; border:1px solid var(--ok); border-radius:8px; padding:12px; margin-top:12px; font-size:14px; line-height:1.55; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🧾 PayReceipt</h1>
+  <p class="sub">Invoice payments in <b>tUSD8</b> on the <b>Aevum testnet</b> (chain 44005).
+  The contract enforces the <b>exact</b> invoiced amount, a paid invoice can never be paid twice,
+  and every payment emits a permanent on-chain receipt anyone can verify.
+  Testnet demo — tokens have no real value.</p>
+
+  <div id="deploy-warning" class="banner" style="display:none">
+    ⚠️ Contract address is not configured yet. Set <code>CONFIG.contractAddress</code> in this file after deployment.
+  </div>
+
+  <div class="card">
+    <h2>Wallet</h2>
+    <div id="wallet-line" class="note">Not connected.</div>
+    <button id="btn-connect">Connect wallet</button>
+    <div class="note" style="margin-top:10px">Contract:
+      <a id="contract-link" href="#" target="_blank" rel="noopener"><code id="contract-addr"></code></a>
+      · Token: <code id="token-addr"></code> (tUSD8, 6 decimals)</div>
+  </div>
+
+  <div class="card">
+    <h2>1 · Create an invoice (merchant)</h2>
+    <label>Payee address — who receives the money</label>
+    <input id="f-payee" placeholder="0x…">
+    <label>Payee name — shown to the payer before they pay (Confirmation of Payee)</label>
+    <input id="f-payee-name" placeholder="e.g. Sari's Bakery">
+    <div class="row">
+      <div><label>Exact amount (tUSD8)</label><input id="f-amount" type="number" min="0" step="0.000001" placeholder="250.00"></div>
+      <div><label>Expires in (days)</label><input id="f-days" type="number" min="1" step="1" value="7"></div>
+    </div>
+    <label>Memo / invoice number</label>
+    <input id="f-memo" placeholder="e.g. INV-2026-001">
+    <button id="btn-create" disabled>Create invoice</button>
+    <div id="create-msg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Look up, verify &amp; pay (payer) — also the receipt view</h2>
+    <label>Invoice ID</label>
+    <div class="row">
+      <div><input id="f-id" type="number" min="1" step="1" placeholder="1"></div>
+      <div><button id="btn-lookup" class="secondary" style="margin-top:0">Look up invoice</button></div>
+    </div>
+    <div id="invoice-view"></div>
+    <div id="pay-actions" style="display:none">
+      <div class="cop" id="cop-box"></div>
+      <div class="row">
+        <button id="btn-approve">Approve exact amount</button>
+        <button id="btn-pay" disabled>Pay invoice</button>
+      </div>
+    </div>
+    <div id="merchant-actions" style="display:none" class="row">
+      <button id="btn-cancel" class="secondary">Cancel invoice (merchant)</button>
+      <button id="btn-refund" class="secondary">Refund to payer (merchant)</button>
+    </div>
+    <div id="pay-msg" class="msg"></div>
+  </div>
+
+  <p class="note">How it works: the merchant creates an invoice for an exact amount payable to a named payee.
+  The payer looks the invoice up and sees the payee's name and the exact amount <i>before</i> approving anything.
+  Payment pulls exactly that amount, exactly once — the <code>InvoicePaid</code> event is the receipt,
+  verifiable by anyone on the explorer. Source &amp; docs: see the project README.</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<script>
+"use strict";
+/* ================= CONFIG — fill in after deployment ================= */
+const CONFIG = {
+  // Deployed on Aevum testnet (chain 44005), 2026-11-20.
+  contractAddress: "0xb5b3F54E5D4D8e2783F1eD5E6f9f64c2749A5C17",
+  tokenAddress: "0x456569838f1d43009A91ebA4263147Afd7233483", // tUSD8, Aevum testnet
+  chainId: 44005,
+  chainHex: "0xABE5",
+  rpc: "https://rpc-test.qday.info",
+  explorer: "https://explorer-test.qday.info"
+};
+/* ==================================================================== */
+
+const PAYRECEIPT_ABI = [
+  "function createInvoice(address payee, string payeeName, uint256 amount, string memo, uint64 expiry) returns (uint256)",
+  "function payInvoice(uint256 invoiceId)",
+  "function cancelInvoice(uint256 invoiceId)",
+  "function refundInvoice(uint256 invoiceId)",
+  "function invoiceCount() view returns (uint256)",
+  "function getInvoice(uint256 invoiceId) view returns (address merchant, address payee, string payeeName, uint256 amount, string memo, uint64 expiry, uint8 status, address payer, uint64 paidAt, bool expired)",
+  "event InvoiceCreated(uint256 indexed invoiceId, address indexed merchant, address indexed payee, string payeeName, uint256 amount, string memo, uint64 expiry)",
+  "event InvoicePaid(uint256 indexed invoiceId, address indexed payer, address indexed payee, uint256 amount, uint64 paidAt)"
+];
+const ERC20_ABI = [
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function decimals() view returns (uint8)"
+];
+const STATUS = ["Open", "Paid", "Cancelled", "Refunded"];
+
+let provider, signer, account, contract, token, currentInvoice = null, currentId = null;
+
+const $ = id => document.getElementById(id);
+const txLink = h => `${CONFIG.explorer}/tx/${h}`;
+const addrLink = a => `${CONFIG.explorer}/address/${a}`;
+function msg(el, text, cls) { el.textContent = text; el.className = "msg " + (cls || ""); }
+function fmtAmt(base) { return ethers.formatUnits(base, 6); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function short(a) { return a ? a.slice(0, 6) + "…" + a.slice(-4) : "—"; }
+
+$("contract-addr").textContent = CONFIG.contractAddress;
+$("contract-link").href = addrLink(CONFIG.contractAddress);
+$("token-addr").textContent = CONFIG.tokenAddress;
+if (CONFIG.contractAddress === "0x0000000000000000000000000000000000000000") {
+  $("deploy-warning").style.display = "block";
+}
+
+async function ensureChain() {
+  try {
+    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CONFIG.chainHex }] });
+  } catch (e) {
+    if (e.code === 4902) {
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [{ chainId: CONFIG.chainHex, chainName: "Aevum Testnet", rpcUrls: [CONFIG.rpc],
+          nativeCurrency: { name: "tQDAY", symbol: "tQDAY", decimals: 18 },
+          blockExplorerUrls: [CONFIG.explorer] }]
+      });
+    } else { throw e; }
+  }
+}
+
+$("btn-connect").onclick = async () => {
+  try {
+    if (!window.ethereum) throw new Error("No wallet found. Install MetaMask or a compatible wallet.");
+    await ensureChain();
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    account = await signer.getAddress();
+    contract = new ethers.Contract(CONFIG.contractAddress, PAYRECEIPT_ABI, signer);
+    token = new ethers.Contract(CONFIG.tokenAddress, ERC20_ABI, signer);
+    const bal = await token.balanceOf(account);
+    $("wallet-line").innerHTML = `Connected: <b>${account}</b> · tUSD8 balance: <b>${fmtAmt(bal)}</b>`;
+    $("btn-create").disabled = false;
+  } catch (e) { $("wallet-line").textContent = "Connection failed: " + (e.message || e); }
+};
+
+$("btn-create").onclick = async () => {
+  const out = $("create-msg");
+  try {
+    const payee = $("f-payee").value.trim();
+    const payeeName = $("f-payee-name").value.trim();
+    const amountHuman = $("f-amount").value;
+    const days = parseInt($("f-days").value, 10);
+    const memo = $("f-memo").value.trim();
+    if (!ethers.isAddress(payee)) throw new Error("Payee address is not valid.");
+    if (!payeeName) throw new Error("Payee name is required (Confirmation of Payee).");
+    if (!amountHuman || Number(amountHuman) <= 0) throw new Error("Amount must be greater than zero.");
+    if (!days || days < 1) throw new Error("Expiry must be at least 1 day.");
+    const amount = ethers.parseUnits(amountHuman, 6);
+    const expiry = Math.floor(Date.now() / 1000) + days * 86400;
+    msg(out, "Sending transaction… confirm in your wallet.");
+    const tx = await contract.createInvoice(payee, payeeName, amount, memo, expiry);
+    const rc = await tx.wait();
+    let newId = null;
+    for (const log of rc.logs) {
+      try { const p = contract.interface.parseLog(log); if (p && p.name === "InvoiceCreated") newId = p.args.invoiceId; } catch (_) {}
+    }
+    msg(out, `Invoice created${newId !== null ? " with ID " + newId.toString() : ""}. Tx: ${tx.hash}`, "ok");
+    out.innerHTML += ` · <a href="${txLink(tx.hash)}" target="_blank" rel="noopener">view on explorer</a>`;
+    if (newId !== null) { $("f-id").value = newId.toString(); lookup(); }
+  } catch (e) { msg(out, "Failed: " + (e.shortMessage || e.message || e), "err"); }
+};
+
+async function lookup() {
+  const out = $("pay-msg");
+  $("invoice-view").innerHTML = ""; $("pay-actions").style.display = "none"; $("merchant-actions").style.display = "none";
+  currentInvoice = null;
+  try {
+    const id = $("f-id").value;
+    if (!id) throw new Error("Enter an invoice ID first.");
+    const readProvider = provider || new ethers.JsonRpcProvider(CONFIG.rpc);
+    const readContract = new ethers.Contract(CONFIG.contractAddress, PAYRECEIPT_ABI, readProvider);
+    const inv = await readContract.getInvoice(id);
+    currentInvoice = inv; currentId = BigInt(id);
+    const st = Number(inv.status); // uint8 — normalize number/bigint across providers
+    const statusName = inv.expired && st === 0 ? "Expired" : STATUS[st];
+    const badgeCls = inv.expired && st === 0 ? "b-expired" : "b-" + STATUS[st].toLowerCase();
+    const rows = [
+      ["Status", `<span class="badge ${badgeCls}">${statusName}</span>`],
+      ["Payee name (Confirmation of Payee)", `<b>${esc(inv.payeeName)}</b>`],
+      ["Payee address", `<a href="${addrLink(inv.payee)}" target="_blank" rel="noopener">${inv.payee}</a>`],
+      ["Exact amount", `<b>${fmtAmt(inv.amount)} tUSD8</b>`],
+      ["Memo", esc(inv.memo) || "—"],
+      ["Merchant", short(inv.merchant)],
+      ["Expiry", new Date(Number(inv.expiry) * 1000).toLocaleString()],
+      ["Payer", inv.payer === ethers.ZeroAddress ? "— (not paid yet)" : inv.payer],
+      ["Paid at", Number(inv.paidAt) === 0 ? "—" : new Date(Number(inv.paidAt) * 1000).toLocaleString()]
+    ];
+    $("invoice-view").innerHTML = rows.map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join("");
+
+    const payable = st === 0 && !inv.expired;
+    if (payable && signer) {
+      $("cop-box").innerHTML =
+        `✔ <b>Check before you pay:</b> you are paying <b>${fmtAmt(inv.amount)} tUSD8</b> to ` +
+        `<b>${esc(inv.payeeName)}</b> (${short(inv.payee)}). If the name is not who you expect, do not pay.`;
+      $("pay-actions").style.display = "block";
+      await refreshApproveState();
+    }
+    if (signer && account && inv.merchant.toLowerCase() === account.toLowerCase()) {
+      $("merchant-actions").style.display = "flex";
+      $("btn-cancel").disabled = st !== 0;
+      $("btn-refund").disabled = st !== 1;
+    }
+    msg(out, payable ? "Invoice is open and payable." : "Invoice loaded.", payable ? "ok" : "");
+  } catch (e) { msg(out, "Lookup failed: " + (e.shortMessage || e.message || e), "err"); }
+}
+$("btn-lookup").onclick = lookup;
+
+async function refreshApproveState() {
+  if (!currentInvoice || !account) return;
+  const allowed = await token.allowance(account, CONFIG.contractAddress);
+  const enough = allowed >= currentInvoice.amount;
+  $("btn-approve").disabled = enough;
+  $("btn-approve").textContent = enough ? "Approved ✓" : "Approve exact amount";
+  $("btn-pay").disabled = !enough;
+}
+
+$("btn-approve").onclick = async () => {
+  const out = $("pay-msg");
+  try {
+    msg(out, "Approving exactly " + fmtAmt(currentInvoice.amount) + " tUSD8…");
+    const tx = await token.approve(CONFIG.contractAddress, currentInvoice.amount);
+    await tx.wait();
+    msg(out, "Approved. Tx: " + tx.hash, "ok");
+    await refreshApproveState();
+  } catch (e) { msg(out, "Approve failed: " + (e.shortMessage || e.message || e), "err"); }
+};
+
+$("btn-pay").onclick = async () => {
+  const out = $("pay-msg");
+  try {
+    msg(out, "Paying… confirm in your wallet.");
+    const tx = await contract.payInvoice(currentId);
+    const rc = await tx.wait();
+    msg(out, "Paid! Receipt is on-chain. Tx: " + tx.hash, "ok");
+    out.innerHTML += ` · <a href="${txLink(tx.hash)}" target="_blank" rel="noopener">view receipt on explorer</a>`;
+    lookup();
+  } catch (e) { msg(out, "Payment failed: " + (e.shortMessage || e.message || e), "err"); }
+};
+
+$("btn-cancel").onclick = async () => {
+  const out = $("pay-msg");
+  try {
+    const tx = await contract.cancelInvoice(currentId);
+    await tx.wait();
+    msg(out, "Invoice cancelled. Tx: " + tx.hash, "ok");
+    lookup();
+  } catch (e) { msg(out, "Cancel failed: " + (e.shortMessage || e.message || e), "err"); }
+};
+
+$("btn-refund").onclick = async () => {
+  const out = $("pay-msg");
+  try {
+    // Refund pulls the amount from the merchant, so the merchant must approve first.
+    const allowed = await token.allowance(account, CONFIG.contractAddress);
+    if (allowed < currentInvoice.amount) {
+      msg(out, "Approving refund amount…");
+      const atx = await token.approve(CONFIG.contractAddress, currentInvoice.amount);
+      await atx.wait();
+    }
+    const tx = await contract.refundInvoice(currentId);
+    await tx.wait();
+    msg(out, "Refunded to the original payer. Tx: " + tx.hash, "ok");
+    lookup();
+  } catch (e) { msg(out, "Refund failed: " + (e.shortMessage || e.message || e), "err"); }
+};
+</script>
+</body>
+</html>
