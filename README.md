@@ -118,7 +118,7 @@ is Shanghai, so Cancun opcodes must never be emitted.
 |---|---|
 | PayReceipt contract | `0xb5b3F54E5D4D8e2783F1eD5E6f9f64c2749A5C17` |
 | Explorer | https://explorer-test.qday.info/address/0xb5b3F54E5D4D8e2783F1eD5E6f9f64c2749A5C17 |
-| Deployed from commit | `18d38aff44aa9901bc04fafa187b7314e069f1b6` |
+| Deployed from commit | `01e73b8a689def22b804ecf757a4f9487bbc18c5` |
 | tUSD8 (fixed) | `0x456569838f1d43009A91ebA4263147Afd7233483` |
 | Live demo UI | https://naomi448.github.io/payreceipt/ |
 
